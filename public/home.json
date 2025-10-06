@@ -1,0 +1,28 @@
+{
+  "todos": [
+    {
+      "id": 1692345600000,
+      "text": "Complete project documentation",
+      "completed": false,
+      "createdAt": "8/18/2025"
+    },
+    {
+      "id": 1692345660000,
+      "text": "Review code changes",
+      "completed": true,
+      "createdAt": "8/18/2025"
+    },
+    {
+      "id": 1692345720000,
+      "text": "Plan next sprint",
+      "completed": false,
+      "createdAt": "8/19/2025"
+    },
+    {
+      "id": 1692345780000,
+      "text": "Update dependencies",
+      "completed": false,
+      "createdAt": "8/19/2025"
+    }
+  ]
+}
