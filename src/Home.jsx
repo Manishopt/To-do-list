@@ -1,13 +1,4 @@
 import { useState, useEffect } from 'react';
-import { 
-  ref, 
-  push, 
-  set, 
-  remove, 
-  onValue,
-  off 
-} from 'firebase/database';
-import { database, auth } from './firebase/firebase';
 
 const Home = () => {
   const [todos, setTodos] = useState([]);
@@ -16,98 +7,78 @@ const Home = () => {
   const [editingText, setEditingText] = useState('');
   const [filter, setFilter] = useState('all');
 
-  // Load todos from Realtime Database
+  // Load todos from localStorage
   useEffect(() => {
-    if (!auth.currentUser) return;
-
-    const todosRef = ref(database, `users/${auth.currentUser.uid}/todos`);
-    
-    const unsubscribe = onValue(todosRef, (snapshot) => {
-      const data = snapshot.val();
-      if (data) {
-        const todosArray = Object.keys(data).map(key => ({
-          id: key,
-          ...data[key]
-        }));
-        // Sort by createdAt (most recent first)
-        todosArray.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-        setTodos(todosArray);
-      } else {
-        // Create initial dummy data if no data exists
-        const dummyTodos = {
-          [Date.now() + 1]: {
-            text: "Complete project documentation",
-            completed: false,
-            createdAt: new Date().toISOString()
-          },
-          [Date.now() + 2]: {
-            text: "Review code changes",
-            completed: true,
-            createdAt: new Date().toISOString()
-          },
-          [Date.now() + 3]: {
-            text: "Plan next sprint",
-            completed: false,
-            createdAt: new Date().toISOString()
-          },
-          [Date.now() + 4]: {
-            text: "Update dependencies",
-            completed: false,
-            createdAt: new Date().toISOString()
-          }
-        };
-        
-        set(todosRef, dummyTodos).catch(error => {
-          console.error('Error creating initial todos:', error);
-        });
-      }
-    }, (error) => {
-      console.error('Error fetching todos:', error);
-    });
-
-    return () => off(todosRef, 'value', unsubscribe);
-  }, [auth.currentUser]);
-
-  const addTodo = async () => {
-    if (inputValue.trim() !== '' && auth.currentUser) {
-      try {
-        const todosRef = ref(database, `users/${auth.currentUser.uid}/todos`);
-        await push(todosRef, {
-          text: inputValue.trim(),
+    const savedTodos = localStorage.getItem('todos');
+    if (savedTodos) {
+      const parsedTodos = JSON.parse(savedTodos);
+      // Sort by createdAt (most recent first)
+      parsedTodos.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      setTodos(parsedTodos);
+    } else {
+      // Create initial demo data if no data exists
+      const demoTodos = [
+        {
+          id: Date.now() + 1,
+          text: "Welcome to your Todo App! 🎉",
           completed: false,
           createdAt: new Date().toISOString()
-        });
-        setInputValue('');
-      } catch (error) {
-        console.error('Error adding todo:', error);
-        alert('Failed to add todo. Please try again.');
-      }
+        },
+        {
+          id: Date.now() + 2,
+          text: "Click the checkbox to mark tasks as complete",
+          completed: false,
+          createdAt: new Date().toISOString()
+        },
+        {
+          id: Date.now() + 3,
+          text: "Use the edit button to modify tasks",
+          completed: false,
+          createdAt: new Date().toISOString()
+        },
+        {
+          id: Date.now() + 4,
+          text: "This demo task is already completed",
+          completed: true,
+          createdAt: new Date().toISOString()
+        }
+      ];
+      setTodos(demoTodos);
+      localStorage.setItem('todos', JSON.stringify(demoTodos));
+    }
+  }, []);
+
+  // Save todos to localStorage whenever todos change
+  useEffect(() => {
+    if (todos.length > 0) {
+      localStorage.setItem('todos', JSON.stringify(todos));
+    }
+  }, [todos]);
+
+  const addTodo = () => {
+    if (inputValue.trim() !== '') {
+      const newTodo = {
+        id: Date.now(),
+        text: inputValue.trim(),
+        completed: false,
+        createdAt: new Date().toISOString()
+      };
+      const updatedTodos = [newTodo, ...todos];
+      setTodos(updatedTodos);
+      setInputValue('');
     }
   };
 
-  const deleteTodo = async (id) => {
-    if (auth.currentUser) {
-      try {
-        const todoRef = ref(database, `users/${auth.currentUser.uid}/todos/${id}`);
-        await remove(todoRef);
-      } catch (error) {
-        console.error('Error deleting todo:', error);
-        alert('Failed to delete todo. Please try again.');
-      }
-    }
+  const deleteTodo = (id) => {
+    const updatedTodos = todos.filter(todo => todo.id !== id);
+    setTodos(updatedTodos);
   };
 
-  const toggleComplete = async (id) => {
-    if (auth.currentUser) {
-      try {
-        const todo = todos.find(t => t.id === id);
-        const todoRef = ref(database, `users/${auth.currentUser.uid}/todos/${id}/completed`);
-        await set(todoRef, !todo.completed);
-      } catch (error) {
-        console.error('Error updating todo:', error);
-        alert('Failed to update todo. Please try again.');
-      }
-    }
+  const toggleComplete = (id) => {
+    const updatedTodos = todos.map(todo =>
+      todo.id === id ? { ...todo, completed: !todo.completed } : todo
+    );
+    setTodos(updatedTodos);
   };
 
   const startEditing = (id, text) => {
@@ -115,15 +86,12 @@ const Home = () => {
     setEditingText(text);
   };
 
-  const saveEdit = async () => {
-    if (editingText.trim() !== '' && auth.currentUser) {
-      try {
-        const todoRef = ref(database, `users/${auth.currentUser.uid}/todos/${editingId}/text`);
-        await set(todoRef, editingText.trim());
-      } catch (error) {
-        console.error('Error updating todo:', error);
-        alert('Failed to update todo. Please try again.');
-      }
+  const saveEdit = () => {
+    if (editingText.trim() !== '') {
+      const updatedTodos = todos.map(todo =>
+        todo.id === editingId ? { ...todo, text: editingText.trim() } : todo
+      );
+      setTodos(updatedTodos);
     }
     setEditingId(null);
     setEditingText('');
@@ -134,20 +102,9 @@ const Home = () => {
     setEditingText('');
   };
 
-  const clearCompleted = async () => {
-    if (auth.currentUser) {
-      try {
-        const completedTodos = todos.filter(todo => todo.completed);
-        const deletePromises = completedTodos.map(todo => {
-          const todoRef = ref(database, `users/${auth.currentUser.uid}/todos/${todo.id}`);
-          return remove(todoRef);
-        });
-        await Promise.all(deletePromises);
-      } catch (error) {
-        console.error('Error clearing completed todos:', error);
-        alert('Failed to clear completed todos. Please try again.');
-      }
-    }
+  const clearCompleted = () => {
+    const updatedTodos = todos.filter(todo => !todo.completed);
+    setTodos(updatedTodos);
   };
 
   const filteredTodos = todos.filter(todo => {
@@ -178,26 +135,45 @@ const Home = () => {
       <div className="max-w-2xl mx-auto">
         {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-gray-800 mb-2">My Todo List</h1>
-          <p className="text-gray-600">Stay organized and get things done!</p>
+          <div className="flex items-center justify-center mb-4">
+            <div className="bg-gradient-to-r from-blue-500 to-purple-600 p-3 rounded-full shadow-lg">
+              <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+              </svg>
+            </div>
+          </div>
+          <h1 className="text-5xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-3">
+            TaskMaster
+          </h1>
+          <p className="text-gray-600 text-lg">Stay organized and get things done! ✨</p>
         </div>
 
         {/* Add Todo Section */}
-        <div className="bg-white rounded-lg shadow-lg p-6 mb-6">
+        <div className="bg-white rounded-xl shadow-xl p-6 mb-6 border border-gray-100">
           <div className="flex gap-3">
-            <input
-              type="text"
-              value={inputValue}
-              onChange={(e) => setInputValue(e.target.value)}
-              onKeyPress={handleKeyPress}
-              placeholder="What needs to be done?"
-              className="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
+            <div className="flex-1 relative">
+              <input
+                type="text"
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+                onKeyPress={handleKeyPress}
+                placeholder="What needs to be done today?"
+                className="w-full px-4 py-3 pl-12 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all duration-200 text-gray-700"
+              />
+              <svg className="w-5 h-5 text-gray-400 absolute left-4 top-1/2 transform -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+              </svg>
+            </div>
             <button
               onClick={addTodo}
-              className="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors duration-200 font-medium"
+              className="px-6 py-3 bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-lg hover:from-blue-600 hover:to-purple-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-all duration-200 font-medium shadow-lg hover:shadow-xl transform hover:scale-105"
             >
-              Add Task
+              <span className="flex items-center gap-2">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                </svg>
+                Add Task
+              </span>
             </button>
           </div>
         </div>
@@ -374,6 +350,7 @@ const Home = () => {
         {/* Footer */}
         <div className="text-center mt-8 text-gray-500 text-sm">
           <p>Built with React & Tailwind CSS</p>
+          <p className="mt-1">Developed by Manish</p>
         </div>
       </div>
     </div>
